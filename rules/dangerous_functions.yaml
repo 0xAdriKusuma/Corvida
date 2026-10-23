@@ -1,0 +1,293 @@
+# rules/dangerous_functions.yaml
+#
+# Database of dangerous/interesting C library functions for pwn/reversing CTFs.
+#
+# Schema per entry:
+#   name:        C symbol name (exact, as it appears in imports/PLT)
+#   aliases:     Alternative symbol names to match (optional)
+#   severity:    critical | high | medium | low
+#   confidence:  certain | high | medium | low
+#   category:    buffer_overflow | format_string | heap | exec | info_leak | other
+#   description: Why this function is dangerous
+#   advice:      One-line suggestion for the CTF player
+#   tags:        List of technique tags (ret2win, ret2libc, fmt, heap, ...)
+#
+# To add a new function: append a new entry here. No code changes needed.
+
+functions:
+
+  # -------------------------------------------------------------------------
+  # Buffer overflow / stack smashing
+  # -------------------------------------------------------------------------
+
+  - name: gets
+    severity: critical
+    confidence: certain
+    category: buffer_overflow
+    description: >
+      Reads an unlimited number of bytes from stdin into a buffer.
+      There is literally no safe use of gets(); it was removed from C11.
+    advice: "Classic stack overflow — look for ret2win, ret2libc, or ROP chain."
+    tags: [stack_overflow, ret2win, ret2libc]
+
+  - name: fgets
+    severity: low
+    confidence: medium
+    category: buffer_overflow
+    description: >
+      Generally safe when used with correct size. Flag only if size argument
+      appears larger than the destination buffer (requires taint analysis).
+    advice: "Verify size argument matches buffer size."
+    tags: []
+
+  - name: strcpy
+    severity: high
+    confidence: high
+    category: buffer_overflow
+    description: >
+      Copies a string without length check. Vulnerable if source is
+      user-controlled and longer than the destination buffer.
+    advice: "Check if source can exceed destination buffer — stack/heap overflow."
+    tags: [stack_overflow, heap_overflow]
+
+  - name: strncpy
+    severity: low
+    confidence: low
+    category: buffer_overflow
+    description: >
+      Has a size parameter but does NOT null-terminate if src is too long.
+      Can cause issues if the result is treated as a C string.
+    advice: "Verify null-termination after strncpy."
+    tags: []
+
+  - name: strcat
+    severity: high
+    confidence: high
+    category: buffer_overflow
+    description: >
+      Appends a string without checking the destination buffer length.
+    advice: "Buffer overflow via string concatenation — check destination size."
+    tags: [stack_overflow]
+
+  - name: strncat
+    severity: low
+    confidence: low
+    category: buffer_overflow
+    description: >
+      Has a size limit but the limit applies to bytes appended, not total length.
+    advice: "Verify total buffer length after strncat."
+    tags: []
+
+  - name: sprintf
+    severity: high
+    confidence: high
+    category: buffer_overflow
+    description: >
+      Writes to a fixed-size buffer without checking length.
+      May also be a format-string vulnerability if format is user-controlled.
+    advice: "Buffer overflow or format string if format comes from user input."
+    tags: [stack_overflow, format_string]
+
+  - name: vsprintf
+    severity: high
+    confidence: high
+    category: buffer_overflow
+    description: Same as sprintf but uses a va_list.
+    advice: "Same risk as sprintf."
+    tags: [stack_overflow, format_string]
+
+  - name: scanf
+    severity: medium
+    confidence: medium
+    category: buffer_overflow
+    description: >
+      Without a width specifier (e.g. %s vs %100s), reads unlimited input.
+      %s with no width is equivalent to gets().
+    advice: "Check format string for unbounded %s — stack overflow possible."
+    tags: [stack_overflow]
+
+  - name: __isoc99_scanf
+    aliases: [scanf]
+    severity: medium
+    confidence: medium
+    category: buffer_overflow
+    description: >
+      Glibc internal name for scanf (ISO C99 compliant version).
+    advice: "Same risk as scanf."
+    tags: [stack_overflow]
+
+  - name: sscanf
+    severity: low
+    confidence: low
+    category: buffer_overflow
+    description: >
+      Reads from a string rather than stdin; lower risk but same format issues.
+    advice: "Check format string for unbounded %s."
+    tags: []
+
+  - name: read
+    severity: medium
+    confidence: medium
+    category: buffer_overflow
+    description: >
+      Raw syscall wrapper — safe if count <= buffer size.
+      Flag when count appears to exceed destination buffer.
+    advice: "Verify read() count argument does not exceed destination buffer."
+    tags: [stack_overflow, heap_overflow]
+
+  - name: memcpy
+    severity: low
+    confidence: low
+    category: buffer_overflow
+    description: >
+      Safe when size is correct. Dangerous if size is user-controlled.
+    advice: "Check if size argument is user-controlled."
+    tags: []
+
+  # -------------------------------------------------------------------------
+  # Format string
+  # -------------------------------------------------------------------------
+
+  - name: printf
+    severity: high
+    confidence: medium
+    category: format_string
+    description: >
+      Format-string vulnerability if the first argument comes from user input
+      (e.g. printf(buf) instead of printf("%s", buf)).
+    advice: "Check if format string is user-controlled — arbitrary read/write possible."
+    tags: [format_string, info_leak]
+
+  - name: fprintf
+    severity: high
+    confidence: medium
+    category: format_string
+    description: Same as printf, writing to a FILE*.
+    advice: "Check if format string (2nd arg) is user-controlled."
+    tags: [format_string, info_leak]
+
+  - name: dprintf
+    severity: high
+    confidence: medium
+    category: format_string
+    description: Same as printf, writing to a file descriptor.
+    advice: "Check if format string (2nd arg) is user-controlled."
+    tags: [format_string]
+
+  - name: vprintf
+    severity: high
+    confidence: medium
+    category: format_string
+    description: printf variant using va_list.
+    advice: "Check format string origin."
+    tags: [format_string]
+
+  - name: syslog
+    severity: medium
+    confidence: medium
+    category: format_string
+    description: >
+      syslog(priority, fmt, ...) — fmt may be user-controlled.
+    advice: "Check if format argument is user-controlled."
+    tags: [format_string]
+
+  # -------------------------------------------------------------------------
+  # Code execution
+  # -------------------------------------------------------------------------
+
+  - name: system
+    severity: critical
+    confidence: certain
+    category: exec
+    description: >
+      Executes a shell command via /bin/sh.
+      If the argument is user-controlled or there is a format/overflow that
+      redirects control here, instant shell.
+    advice: "Prime ret2win / ret2libc target — call with '/bin/sh' to get shell."
+    tags: [ret2win, ret2libc, exec]
+
+  - name: execve
+    severity: critical
+    confidence: certain
+    category: exec
+    description: >
+      Low-level exec syscall. Direct shell if argument is '/bin/sh'.
+    advice: "execve('/bin/sh', 0, 0) gives shell — classic ret2syscall target."
+    tags: [ret2syscall, exec]
+
+  - name: execvp
+    severity: critical
+    confidence: certain
+    category: exec
+    description: Executes a program searched in PATH.
+    advice: "PATH hijacking possible if argument is not absolute."
+    tags: [exec]
+
+  - name: popen
+    severity: high
+    confidence: high
+    category: exec
+    description: Opens a pipe to/from a shell command.
+    advice: "If argument is user-controlled, arbitrary command execution."
+    tags: [exec]
+
+  - name: execlp
+    severity: high
+    confidence: high
+    category: exec
+    description: exec variant using PATH search.
+    advice: "PATH hijacking if argument is not absolute."
+    tags: [exec]
+
+  # -------------------------------------------------------------------------
+  # Heap / memory management
+  # -------------------------------------------------------------------------
+
+  - name: malloc
+    severity: low
+    confidence: low
+    category: heap
+    description: >
+      Not dangerous by itself; presence with free/realloc may indicate
+      heap exploitation surface.
+    advice: "Look for use-after-free or double-free patterns."
+    tags: [heap]
+
+  - name: free
+    severity: medium
+    confidence: medium
+    category: heap
+    description: >
+      Double-free or use-after-free is a common heap exploitation primitive.
+    advice: "Check for double-free or use-after-free (UAF) patterns."
+    tags: [heap, uaf, double_free]
+
+  - name: realloc
+    severity: low
+    confidence: low
+    category: heap
+    description: May move a chunk; old pointer becomes dangling.
+    advice: "Check for dangling pointer after realloc."
+    tags: [heap, uaf]
+
+  # -------------------------------------------------------------------------
+  # Information leaks
+  # -------------------------------------------------------------------------
+
+  - name: puts
+    severity: low
+    confidence: low
+    category: info_leak
+    description: >
+      Prints a string terminated by newline.
+      Useful in ret2plt for leaking libc addresses.
+    advice: "Can be used in ret2plt to leak GOT entry (libc base leak)."
+    tags: [info_leak, ret2plt]
+
+  - name: write
+    severity: low
+    confidence: low
+    category: info_leak
+    description: Raw write syscall — useful for leaking memory.
+    advice: "Can be used to leak arbitrary memory in ROP."
+    tags: [info_leak]

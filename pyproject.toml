@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "corvida"
+version = "0.1.0"
+description = "CTF binary triage tool — one command, curated summary"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "corvida contributors" }]
+keywords = ["ctf", "pwn", "reversing", "elf", "triage", "security"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Security",
+    "Environment :: Console",
+]
+dependencies = [
+    "typer[all]>=0.12",
+    "rich>=13",
+    "pyelftools>=0.31",
+    "PyYAML>=6",
+    "rzpipe>=0.4; platform_system != 'Windows'",  # rzpipe optional; handled gracefully
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov", "mypy", "ruff"]
+rzpipe = ["rzpipe>=0.4"]
+
+[project.scripts]
+corvida = "corvida.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.mypy]
+python_version = "3.10"
+strict = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
