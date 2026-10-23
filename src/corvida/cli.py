@@ -27,15 +27,11 @@ app = typer.Typer(
     help="CTF binary triage tool -- one command, curated summary.",
     add_completion=False,
     rich_markup_mode="rich",
-    pretty_exceptions_enable=False,   # We handle our own error formatting
+    pretty_exceptions_enable=False,
 )
 
 _err_console = Console(stderr=True, highlight=False)
 
-
-# ---------------------------------------------------------------------------
-# Main command
-# ---------------------------------------------------------------------------
 
 @app.command()
 def analyse(
@@ -118,7 +114,6 @@ def analyse(
     report.metadata["analysis_time_s"] = round(elapsed, 3)
     report.metadata["corvida_version"] = __version__
 
-    # Select reporter
     reporter_name = "json" if json_out else "terminal"
     reporter_cls = reporter_registry.get(reporter_name)
     if reporter_cls is None:
@@ -131,24 +126,15 @@ def analyse(
     reporter = reporter_cls()
     reporter.render(report, cfg)
 
-    # Exit non-zero if there were errors (useful for CI)
     if report.errors and not json_out:
         raise typer.Exit(code=1)
 
-
-# ---------------------------------------------------------------------------
-# Version command
-# ---------------------------------------------------------------------------
 
 @app.command()
 def version() -> None:
     """Print Corvida version and exit."""
     typer.echo(f"Corvida {__version__}")
 
-
-# ---------------------------------------------------------------------------
-# __main__ entry
-# ---------------------------------------------------------------------------
 
 def main() -> None:
     app()

@@ -26,18 +26,13 @@ from corvida.core.models import (
 from corvida.core.registry import register_analyzer
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def _get_elftools():
     try:
         from elftools.elf.elffile import ELFFile
         from elftools.elf.dynamic import DynamicSection
-        from elftools.elf.gnuhash import GNUHashSection
-        return ELFFile, DynamicSection, GNUHashSection
+        return ELFFile, DynamicSection
     except ImportError:
-        return None, None, None
+        return None, None
 
 
 def _has_symbol(elf, name: str) -> bool:
@@ -120,10 +115,6 @@ def _check_fortify(elf) -> bool:
     return False
 
 
-# ---------------------------------------------------------------------------
-# Analyzer
-# ---------------------------------------------------------------------------
-
 @register_analyzer
 class ChecksecAnalyzer(BaseAnalyzer):
     """Checks ELF security mitigations (NX, PIE, Canary, RELRO, FORTIFY)."""
@@ -136,7 +127,7 @@ class ChecksecAnalyzer(BaseAnalyzer):
     def analyze(
         self, target: Target, config: Config, backend=None
     ) -> list[Finding]:
-        ELFFile, _, _ = _get_elftools()
+        ELFFile, _ = _get_elftools()
         if ELFFile is None:
             return [self._error_finding(
                 "checksec skipped",
@@ -156,7 +147,6 @@ class ChecksecAnalyzer(BaseAnalyzer):
     def _run(self, target: Target, elf) -> list[Finding]:
         findings: list[Finding] = []
 
-        # ---- NX ----
         nx = _check_nx(elf)
         findings.append(Finding(
             title    = f"NX: {'enabled' if nx else 'DISABLED'}",
@@ -169,7 +159,6 @@ class ChecksecAnalyzer(BaseAnalyzer):
             extra    = {"key": "nx", "value": nx},
         ))
 
-        # ---- PIE ----
         pie = target.is_pie
         findings.append(Finding(
             title    = f"PIE: {'enabled' if pie else 'DISABLED'}",
@@ -182,7 +171,6 @@ class ChecksecAnalyzer(BaseAnalyzer):
             extra    = {"key": "pie", "value": pie},
         ))
 
-        # ---- Stack Canary ----
         canary = _check_canary(elf)
         findings.append(Finding(
             title    = f"Stack Canary: {'present' if canary else 'ABSENT'}",
@@ -196,7 +184,6 @@ class ChecksecAnalyzer(BaseAnalyzer):
             extra    = {"key": "canary", "value": canary},
         ))
 
-        # ---- RELRO ----
         relro = _check_relro(elf)
         relro_sev = {
             "full":    Severity.INFO,
@@ -218,7 +205,6 @@ class ChecksecAnalyzer(BaseAnalyzer):
             extra    = {"key": "relro", "value": relro},
         ))
 
-        # ---- FORTIFY ----
         fortify = _check_fortify(elf)
         findings.append(Finding(
             title    = f"FORTIFY: {'enabled' if fortify else 'not detected'}",

@@ -13,7 +13,6 @@ from __future__ import annotations
 from corvida.core.models import Category, Confidence, Finding, Report, Severity
 
 
-# Score weight tables (same as models.py _default_score, kept in sync)
 _SEV_WEIGHT = {
     Severity.CRITICAL: 1.0,
     Severity.HIGH:     0.75,
@@ -46,12 +45,6 @@ def _apply_base_scores(report: Report) -> None:
 
 
 def _apply_context_boosts(report: Report) -> None:
-    """
-    Cross-finding boosts.
-
-    Example: if NX is disabled AND we found a dangerous function,
-    boost that finding's score.
-    """
     prot_findings = {
         f.extra.get("key"): f
         for f in report.by_category(Category.PROTECTIONS)
@@ -68,10 +61,10 @@ def _apply_context_boosts(report: Report) -> None:
             continue
         boost = 0.0
         if nx_off:
-            boost += 0.05   # shellcode-friendly
+            boost += 0.05
         if canary_off:
-            boost += 0.10   # stack smashing easier
+            boost += 0.10
         if pie_off:
-            boost += 0.05   # addresses predictable
+            boost += 0.05
         if boost:
             f.score = min(1.0, f.score + boost)

@@ -56,10 +56,6 @@ class BaseAnalyzer(ABC):
         Must return a list (may be empty).
         """
 
-    # -----------------------------------------------------------------------
-    # Helpers available to subclasses
-    # -----------------------------------------------------------------------
-
     def _error_finding(self, title: str, detail: str) -> Finding:
         from corvida.core.models import Confidence, Severity
         return Finding(

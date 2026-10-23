@@ -30,11 +30,6 @@ from corvida.core.models import (
 from corvida.core.registry import register_reporter
 from corvida.reporters.base import BaseReporter
 
-
-# ---------------------------------------------------------------------------
-# Color / style helpers
-# ---------------------------------------------------------------------------
-
 _SEV_COLOR = {
     Severity.CRITICAL: "bold red",
     Severity.HIGH:     "red",
@@ -83,10 +78,6 @@ def _tick(value: bool | None) -> str:
     return _BOOL_STYLE.get(value, ("?", "dim"))[0]
 
 
-# ---------------------------------------------------------------------------
-# Reporter
-# ---------------------------------------------------------------------------
-
 @register_reporter
 class TerminalReporter(BaseReporter):
     """Renders a Rich terminal summary of the analysis report."""
@@ -102,7 +93,6 @@ class TerminalReporter(BaseReporter):
 
         target = report.target
 
-        # ---- Header --------------------------------------------------------
         console.rule(
             f"[bold cyan]CORVIDA[/bold cyan]  [bold]{escape(target.name)}[/bold]",
             style="cyan",
@@ -113,30 +103,16 @@ class TerminalReporter(BaseReporter):
         )
         console.print()
 
-        # ---- Binary Info ---------------------------------------------------
         self._render_binary_info(console, report)
-
-        # ---- Protections ---------------------------------------------------
         self._render_protections(console, report)
-
-        # ---- Dangerous Functions -------------------------------------------
         self._render_dangerous_funcs(console, report, config)
-
-        # ---- Interesting Strings -------------------------------------------
         self._render_strings(console, report, config)
-
-        # ---- Advisories ----------------------------------------------------
         self._render_advisories(console, report)
 
-        # ---- Errors --------------------------------------------------------
         if report.errors:
             self._render_errors(console, report)
 
         console.rule(style="dim")
-
-    # ------------------------------------------------------------------
-    # Section renderers
-    # ------------------------------------------------------------------
 
     def _render_binary_info(self, console: Console, report: Report) -> None:
         t = report.target
@@ -184,7 +160,6 @@ class TerminalReporter(BaseReporter):
             else:
                 val_str = str(val) if val is not None else "?"
 
-            # Mitigation name from title
             title_clean = f.title.split(":")[0].strip()
             note = (f.advice or "")[: 80]
 
@@ -226,13 +201,12 @@ class TerminalReporter(BaseReporter):
                 caller_str,
             )
 
-        # Advice panel below table
         advice_lines: list[str] = []
         for f in findings:
             if f.advice:
                 advice_lines.append(f"[dim]•[/dim] {escape(f.advice)}")
 
-        body = table
+        body: Any = table
         if advice_lines and config.verbose:
             from rich.console import Group
             advice_text = "\n".join(advice_lines[:5])
@@ -285,7 +259,6 @@ class TerminalReporter(BaseReporter):
             conf = _conf_badge(f.confidence)
             lines.append(f"{sev} {conf}  [bold]{escape(f.title)}[/bold]")
             if f.advice:
-                # Wrap advice at ~90 chars
                 for part in _wrap(f.advice, 88):
                     lines.append(f"  [dim]{escape(part)}[/dim]")
             lines.append("")
@@ -301,11 +274,7 @@ class TerminalReporter(BaseReporter):
         console.print(Panel(lines, title="[bold yellow]Warnings / Errors[/bold yellow]", border_style="yellow"))
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def _wrap(text: str, width: int) -> list[str]:
-    """Very simple word-wrap."""
+    """Simple word-wrap."""
     import textwrap
     return textwrap.wrap(text, width=width)

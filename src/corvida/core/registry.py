@@ -64,67 +64,47 @@ class Registry(dict[str, type]):
             )
 
 
-# ---------------------------------------------------------------------------
-# Singleton registries — import these everywhere
-# ---------------------------------------------------------------------------
-
 loader_registry:   Registry = Registry()
 backend_registry:  Registry = Registry()
 analyzer_registry: Registry = Registry()
 reporter_registry: Registry = Registry()
 
 
-# ---------------------------------------------------------------------------
-# Convenience decorators
-# ---------------------------------------------------------------------------
-
 def register_loader(cls: type) -> type:
-    """Decorator: register an ELF/PE/… loader."""
+    """Register an ELF/PE loader."""
     return loader_registry.register(cls)
 
 
 def register_backend(cls: type) -> type:
-    """Decorator: register a backend (rizin, pwntools, …)."""
+    """Register a backend (rizin, etc.)."""
     return backend_registry.register(cls)
 
 
 def register_analyzer(cls: type) -> type:
-    """Decorator: register an analyzer."""
+    """Register an analyzer."""
     return analyzer_registry.register(cls)
 
 
 def register_reporter(cls: type) -> type:
-    """Decorator: register a reporter."""
+    """Register a reporter."""
     return reporter_registry.register(cls)
 
-
-# ---------------------------------------------------------------------------
-# Auto-discovery: import all sub-packages so decorators fire
-# ---------------------------------------------------------------------------
 
 def _import_all() -> None:
     """
     Import every module that contains registered components.
 
     Called once at startup (from pipeline.py or cli.py).
-    We list them explicitly so that:
-    - The import graph stays visible and auditable
-    - Missing optional deps don't crash the whole tool
     """
     import importlib, traceback
 
     MODULES = [
-        # Loaders
         "corvida.loaders.elf",
-        # Backends
         "corvida.backends.rizin",
-        # Analyzers — common
         "corvida.analyzers.common.strings",
-        # Analyzers — pwn
         "corvida.analyzers.pwn.binary_info",
         "corvida.analyzers.pwn.checksec",
         "corvida.analyzers.pwn.dangerous_funcs",
-        # Reporters
         "corvida.reporters.terminal",
         "corvida.reporters.json_out",
     ]
@@ -133,7 +113,6 @@ def _import_all() -> None:
         try:
             importlib.import_module(mod)
         except Exception as exc:          # noqa: BLE001
-            # Non-fatal: log but keep going so partial configs still work
             import warnings
             warnings.warn(
                 f"[registry] Could not import '{mod}': {exc}",

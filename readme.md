@@ -1,4 +1,4 @@
-# Corvida 🦅
+# Corvida
 
 **CTF binary triage tool — one command, curated summary.**
 
@@ -8,7 +8,7 @@ triage report — instead of dumping every byte of metadata at you.
 ```
 $ corvida ./vuln
 
-──────────────────── 🦅 CORVIDA  vuln ─────────────────────
+─────────────────────── CORVIDA  vuln ────────────────────────
   sha256: deadbeef...  size: 8,192 bytes
 
 ┌─ Binary Info ──────────────────────────────────────────────┐

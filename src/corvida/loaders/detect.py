@@ -47,26 +47,28 @@ def _sniff(path: Path) -> str | None:
     return None
 
 
-def detect_loader(path: Path) -> type:
+def detect_loader(path: Path) -> type[BaseLoader]:
     """
     Return the best loader class for *path*.
 
     Raises UnsupportedFormatError if no loader matches.
     """
+    from typing import cast
     from corvida.core.registry import loader_registry
+    from corvida.loaders.base import BaseLoader
 
     file_type = _sniff(path)
 
-    # Try each registered loader in priority order
     for name in _LOADER_ORDER:
-        cls = loader_registry.get(name)
-        if cls is None:
+        raw_cls = loader_registry.get(name)
+        if raw_cls is None:
             continue
+        cls = cast(type[BaseLoader], raw_cls)
         if cls.can_load(path):
             return cls
 
-    # Fallback: try remaining registered loaders
-    for cls in loader_registry.all():
+    for raw_cls in loader_registry.all():
+        cls = cast(type[BaseLoader], raw_cls)
         if cls.can_load(path):
             return cls
 

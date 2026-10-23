@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import ClassVar
 
 from corvida.core.models import Target
 
@@ -29,7 +30,7 @@ class BaseLoader(ABC):
     """
 
     name: str = ""
-    supported_types: list[str] = []
+    supported_types: ClassVar[list[str]] = []
 
     @classmethod
     @abstractmethod

@@ -16,43 +16,25 @@ from corvida.core.config import Config
 from corvida.core.models import Category, Report
 
 
-# ---------------------------------------------------------------------------
-# Minimal valid ELF header (x86-64, little-endian, ET_EXEC)
-# ---------------------------------------------------------------------------
-
 def _make_elf_binary(tmp_path: Path, extra_data: bytes = b"") -> Path:
-    """
-    Write a syntactically valid ELF64 header so pyelftools accepts it.
-
-    We only fill mandatory header fields; sections/segments are empty
-    (pyelftools tolerates this for basic parsing).
-    """
+    """Write a syntactically valid ELF64 header for testing."""
     import struct
 
     elf = bytearray(64)
-    # e_ident
-    elf[0:4]   = b"\x7fELF"   # magic
-    elf[4]     = 2             # ELFCLASS64
-    elf[5]     = 1             # ELFDATA2LSB (little-endian)
-    elf[6]     = 1             # EV_CURRENT
-    elf[7]     = 0             # ELFOSABI_NONE
-    # e_type = ET_EXEC (2)
+    elf[0:4] = b"\x7fELF"
+    elf[4] = 2
+    elf[5] = 1
+    elf[6] = 1
+    elf[7] = 0
     struct.pack_into("<H", elf, 16, 2)
-    # e_machine = EM_X86_64 (62)
     struct.pack_into("<H", elf, 18, 62)
-    # e_version = 1
     struct.pack_into("<I", elf, 20, 1)
-    # e_ehsize = 64
     struct.pack_into("<H", elf, 52, 64)
 
     p = tmp_path / "mock_elf"
     p.write_bytes(bytes(elf) + extra_data)
     return p
 
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
 
 class TestPipelineWithMockBackend:
     @pytest.fixture

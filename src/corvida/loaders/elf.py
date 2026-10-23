@@ -11,20 +11,18 @@ Responsibilities
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, ClassVar
 
 from corvida.core.errors import BackendUnavailableError, LoaderError
 from corvida.core.models import Target
 from corvida.core.registry import register_loader
 from corvida.loaders.base import BaseLoader
 
-# ---------------------------------------------------------------------------
-# Lazy import guard for pyelftools
-# ---------------------------------------------------------------------------
 
 def _get_elftools():
     try:
-        from elftools.elf.elffile import ELFFile
         from elftools.common.exceptions import ELFError
+        from elftools.elf.elffile import ELFFile
         return ELFFile, ELFError
     except ImportError:
         raise BackendUnavailableError(
@@ -32,10 +30,6 @@ def _get_elftools():
             "Install it with:  pip install pyelftools"
         )
 
-
-# ---------------------------------------------------------------------------
-# Architecture mapping
-# ---------------------------------------------------------------------------
 
 _ARCH_MAP: dict[str, str] = {
     "EM_386":    "x86",
@@ -55,11 +49,7 @@ class ElfLoader(BaseLoader):
     """Loader for ELF binaries (32-bit and 64-bit)."""
 
     name = "elf"
-    supported_types = ["ELF"]
-
-    # ------------------------------------------------------------------
-    # Magic byte check
-    # ------------------------------------------------------------------
+    supported_types: ClassVar[list[str]] = ["ELF"]
 
     @classmethod
     def can_load(cls, path: Path) -> bool:
@@ -68,10 +58,6 @@ class ElfLoader(BaseLoader):
                 return fh.read(4) == b"\x7fELF"
         except OSError:
             return False
-
-    # ------------------------------------------------------------------
-    # Main load
-    # ------------------------------------------------------------------
 
     def load(self, path: Path) -> Target:
         ELFFile, ELFError = _get_elftools()
@@ -85,40 +71,28 @@ class ElfLoader(BaseLoader):
         except OSError as exc:
             raise LoaderError(f"Cannot open '{path}': {exc}") from exc
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-
-    def _parse(self, path: Path, elf: object) -> Target:
+    def _parse(self, path: Path, elf: Any) -> Target:
         """Extract all Target fields from an open ELFFile."""
         target = Target(path=path)
 
-        # Architecture
         machine = elf.header.e_machine
         target.arch = _ARCH_MAP.get(machine, machine)
-        target.bits = elf.elfclass          # 32 or 64
+        target.bits = elf.elfclass
         target.endian = "little" if elf.little_endian else "big"
         target.file_type = "ELF"
-
-        # PIE: ET_DYN type indicates PIE or shared library
-        e_type = elf.header.e_type
-        target.is_pie = (e_type == "ET_DYN")
-
-        # Stripped: check for .symtab section
+        target.is_pie = (elf.header.e_type == "ET_DYN")
         target.is_stripped = elf.get_section_by_name(".symtab") is None
-
-        # Interpreter (dynamic linker)
         target.interpreter = self._get_interpreter(elf)
 
         return target
 
     @staticmethod
-    def _get_interpreter(elf: object) -> str | None:
+    def _get_interpreter(elf: Any) -> str | None:
         """Return the PT_INTERP path or None for statically linked binaries."""
         try:
             for seg in elf.iter_segments():
                 if seg.header.p_type == "PT_INTERP":
                     return seg.get_interp_name()
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001, S110
             pass
         return None

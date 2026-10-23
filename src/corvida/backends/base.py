@@ -32,10 +32,6 @@ class BaseBackend(ABC):
         self.path = path
         self.timeout = timeout
 
-    # -----------------------------------------------------------------------
-    # Lifecycle
-    # -----------------------------------------------------------------------
-
     @abstractmethod
     def open(self) -> None:
         """Open a session with the underlying tool."""
@@ -50,10 +46,6 @@ class BaseBackend(ABC):
 
     def __exit__(self, *_: Any) -> None:
         self.close()
-
-    # -----------------------------------------------------------------------
-    # Query API — return plain Python structures (no rzpipe/pyelftools types)
-    # -----------------------------------------------------------------------
 
     @abstractmethod
     def imports(self) -> list[dict[str, Any]]:

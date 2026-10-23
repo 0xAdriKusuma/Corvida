@@ -15,17 +15,13 @@ from pathlib import Path
 from typing import Any
 
 
-# ---------------------------------------------------------------------------
-# Enumerations
-# ---------------------------------------------------------------------------
-
 class Severity(str, Enum):
     """Risk level of a finding."""
-    CRITICAL = "critical"   # Almost certainly exploitable
-    HIGH     = "high"       # Very likely interesting
-    MEDIUM   = "medium"     # Worth investigating
-    LOW      = "low"        # Informational with minor relevance
-    INFO     = "info"       # Pure information, no risk assessment
+    CRITICAL = "critical"
+    HIGH     = "high"
+    MEDIUM   = "medium"
+    LOW      = "low"
+    INFO     = "info"
 
 
 class Category(str, Enum):
@@ -36,24 +32,16 @@ class Category(str, Enum):
     DANGEROUS_FUNC = "dangerous_func"
     ADVISORY       = "advisory"
     ERROR          = "error"
-    INFO           = "info"    # Generic / uncategorised informational finding
+    INFO           = "info"
 
 
 class Confidence(str, Enum):
-    """
-    How confident the heuristic is.
+    """How confident the heuristic is."""
+    CERTAIN  = "certain"
+    HIGH     = "high"
+    MEDIUM   = "medium"
+    LOW      = "low"
 
-    Findings are *hints*, not conclusions — always pair with confidence.
-    """
-    CERTAIN  = "certain"   # 100% deterministic (e.g., ELF magic bytes present)
-    HIGH     = "high"      # Strong heuristic, very likely correct
-    MEDIUM   = "medium"    # Reasonable heuristic, may have false positives
-    LOW      = "low"       # Weak signal, treat as lead only
-
-
-# ---------------------------------------------------------------------------
-# Target — the binary being analysed
-# ---------------------------------------------------------------------------
 
 @dataclass
 class Target:
@@ -68,14 +56,13 @@ class Target:
     size: int = field(init=False)
     """File size in bytes."""
 
-    # Optional metadata populated by loaders/backends
-    arch: str | None = None          # e.g. "x86", "x86_64", "arm"
-    bits: int | None = None          # 32 or 64
-    endian: str | None = None        # "little" or "big"
-    file_type: str | None = None     # "ELF", "PE", "Mach-O", …
+    arch: str | None = None
+    bits: int | None = None
+    endian: str | None = None
+    file_type: str | None = None
     is_stripped: bool | None = None
     is_pie: bool | None = None
-    interpreter: str | None = None   # ELF PT_INTERP (dynamic linker path)
+    interpreter: str | None = None
 
     def __post_init__(self) -> None:
         self.path = Path(self.path).resolve()
@@ -95,10 +82,6 @@ def _sha256(path: Path) -> str:
             h.update(chunk)
     return h.hexdigest()
 
-
-# ---------------------------------------------------------------------------
-# Finding — atomic result from any analyzer
-# ---------------------------------------------------------------------------
 
 @dataclass
 class Finding:
@@ -138,10 +121,6 @@ class Finding:
     Arbitrary extra data for machine consumers (JSON reporter).
     Do NOT use this field in terminal rendering logic.
     """
-
-    # -----------------------------------------------------------------------
-    # Priority score — computed lazily, overridable
-    # -----------------------------------------------------------------------
 
     _score: float | None = field(default=None, repr=False)
 
@@ -191,10 +170,6 @@ def _default_score(severity: Severity, confidence: Confidence) -> float:
     return SEV[severity] * CONF[confidence]
 
 
-# ---------------------------------------------------------------------------
-# Report — final output container
-# ---------------------------------------------------------------------------
-
 @dataclass
 class Report:
     """Aggregated analysis results for one Target."""
@@ -203,7 +178,6 @@ class Report:
 
     findings: list[Finding] = field(default_factory=list)
 
-    # Populated by pipeline after all analyzers run
     errors: list[str] = field(default_factory=list)
 
     metadata: dict[str, Any] = field(default_factory=dict)

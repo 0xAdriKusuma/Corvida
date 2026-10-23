@@ -28,11 +28,6 @@ from corvida.core.models import (
 )
 from corvida.core.registry import register_analyzer
 
-
-# ---------------------------------------------------------------------------
-# Rules loader
-# ---------------------------------------------------------------------------
-
 _SEVERITY_MAP = {
     "critical": Severity.CRITICAL,
     "high":     Severity.HIGH,
@@ -79,10 +74,6 @@ def load_rules(rules_dir: Path) -> dict[str, dict]:
     return result
 
 
-# ---------------------------------------------------------------------------
-# ELF import fallback (no backend)
-# ---------------------------------------------------------------------------
-
 def _get_imports_via_pyelftools(path: Path) -> list[dict[str, Any]]:
     """Parse ELF imports using pyelftools when backend is unavailable."""
     try:
@@ -111,10 +102,6 @@ def _get_imports_via_pyelftools(path: Path) -> list[dict[str, Any]]:
     return imports
 
 
-# ---------------------------------------------------------------------------
-# Analyzer
-# ---------------------------------------------------------------------------
-
 @register_analyzer
 class DangerousFuncsAnalyzer(BaseAnalyzer):
     """Identifies dangerous imported functions and their call sites."""
@@ -122,18 +109,16 @@ class DangerousFuncsAnalyzer(BaseAnalyzer):
     name     = "dangerous_funcs"
     category = Category.DANGEROUS_FUNC
     supports = ["ELF"]
-    requires_backend = False   # backend improves xref info but not required
+    requires_backend = False
 
     def analyze(
         self, target: Target, config: Config, backend: BaseBackend | None = None
     ) -> list[Finding]:
-        # Load rules
         try:
             rules = load_rules(config.rules_dir)
         except RuleError as exc:
             return [self._error_finding("dangerous_funcs: rules error", str(exc))]
 
-        # Get imports
         if backend is not None:
             try:
                 imports = backend.imports()
@@ -162,7 +147,6 @@ class DangerousFuncsAnalyzer(BaseAnalyzer):
             advice      = rule.get("advice", "")
             tags        = rule.get("tags", [])
 
-            # Cross-references (callers) — best-effort
             callers: list[str] = []
             plt_addr = imp.get("plt")
             if backend is not None and plt_addr:

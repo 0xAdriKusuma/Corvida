@@ -26,12 +26,6 @@ from corvida.core.models import (
 )
 from corvida.core.registry import register_analyzer
 
-
-# ---------------------------------------------------------------------------
-# Interest patterns
-# ---------------------------------------------------------------------------
-
-# Each entry: (regex pattern, label, severity, confidence boost 0.0–1.0)
 _PATTERNS: list[tuple[str, str, Severity, float]] = [
     # Shell
     (r"/bin/sh",              "Shell invocation",        Severity.HIGH,   1.0),
@@ -69,10 +63,6 @@ _COMPILED = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Pure-Python fallback string scanner
-# ---------------------------------------------------------------------------
-
 _PRINTABLE = set(range(0x20, 0x7F)) | {0x09, 0x0A, 0x0D}
 
 
@@ -100,10 +90,6 @@ def _scan_binary(path: Path, min_len: int) -> list[dict]:
     return results
 
 
-# ---------------------------------------------------------------------------
-# Scoring helper
-# ---------------------------------------------------------------------------
-
 def _score_string(s: str) -> tuple[float, str, Severity, Confidence]:
     """Return (score, label, severity, confidence) for a string."""
     best_score = 0.0
@@ -122,23 +108,18 @@ def _score_string(s: str) -> tuple[float, str, Severity, Confidence]:
     return best_score, best_label, best_sev, best_conf
 
 
-# ---------------------------------------------------------------------------
-# Analyzer
-# ---------------------------------------------------------------------------
-
 @register_analyzer
 class StringsAnalyzer(BaseAnalyzer):
     """Extracts and scores interesting printable strings from a binary."""
 
     name     = "strings"
     category = Category.STRINGS
-    supports = []   # Works on any binary type
-    requires_backend = False   # Has fallback; backend improves accuracy
+    supports = []
+    requires_backend = False
 
     def analyze(
         self, target: Target, config: Config, backend: BaseBackend | None = None
     ) -> list[Finding]:
-        # Collect raw strings
         if backend is not None:
             try:
                 raw = backend.strings(min_len=config.min_string_len)
@@ -147,15 +128,13 @@ class StringsAnalyzer(BaseAnalyzer):
         else:
             raw = _scan_binary(target.path, config.min_string_len)
 
-        # Score and filter
-        scored: list[tuple[float, dict]] = []
+        scored: list[tuple[float, dict, str, Severity, Confidence]] = []
         for entry in raw:
             s = entry.get("string", "")
             sc, label, sev, conf = _score_string(s)
             if sc > 0:
                 scored.append((sc, entry, label, sev, conf))
 
-        # Sort by score desc, take top-N
         scored.sort(key=lambda x: x[0], reverse=True)
         top = scored[: config.max_strings]
 

@@ -22,10 +22,6 @@ from corvida.core.models import (
 )
 
 
-# ---------------------------------------------------------------------------
-# Rule definition
-# ---------------------------------------------------------------------------
-
 @dataclass
 class AdvisoryRule:
     """A single advisory rule."""
@@ -37,10 +33,6 @@ class AdvisoryRule:
     condition:  Callable[[Report], bool]
     tags:       list[str]
 
-
-# ---------------------------------------------------------------------------
-# Helpers for rule conditions
-# ---------------------------------------------------------------------------
 
 def _prot(report: Report, key: str) -> bool | str | None:
     """Return the 'value' extra field for a protection finding keyed by 'key'."""
@@ -94,10 +86,6 @@ def _has_string(report: Report, pattern: str) -> bool:
             return True
     return False
 
-
-# ---------------------------------------------------------------------------
-# Rule definitions
-# ---------------------------------------------------------------------------
 
 _RULES: list[AdvisoryRule] = [
 
@@ -236,10 +224,6 @@ _RULES: list[AdvisoryRule] = [
     ),
 ]
 
-
-# ---------------------------------------------------------------------------
-# Advisor
-# ---------------------------------------------------------------------------
 
 class RulesAdvisor:
     """Evaluates advisory rules against a completed Report."""

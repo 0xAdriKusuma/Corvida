@@ -42,24 +42,18 @@ class RizinBackend(BaseBackend):
 
     def __init__(self, path: Path, timeout: int = 30) -> None:
         super().__init__(path, timeout)
-        self._rz = None      # rzpipe handle
+        self._rz = None
         self._analysed = False
-
-    # ------------------------------------------------------------------
-    # Lifecycle
-    # ------------------------------------------------------------------
 
     def open(self) -> None:
         rzpipe = _import_rzpipe()
         try:
-            # -2: open without performing analysis (we call 'aaa' manually)
             self._rz = rzpipe.open(str(self.path), flags=["-2"])
         except Exception as exc:
             raise BackendUnavailableError(
                 f"rzpipe failed to open '{self.path.name}': {exc}\n{_INSTALL_HINT}"
             ) from exc
 
-        # Run analysis — 'aa' is faster than 'aaa' and enough for imports/xrefs
         self._cmd("aa")
         self._analysed = True
 
@@ -70,10 +64,6 @@ class RizinBackend(BaseBackend):
             except Exception:   # noqa: BLE001
                 pass
             self._rz = None
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
 
     def _cmd(self, cmd: str) -> str:
         """Run a rizin command and return raw output."""
@@ -90,10 +80,6 @@ class RizinBackend(BaseBackend):
             return self._rz.cmdj(cmd) or []
         except Exception as exc:   # noqa: BLE001
             raise BackendError(f"rzpipe cmdj failed for '{cmd}': {exc}") from exc
-
-    # ------------------------------------------------------------------
-    # Query API
-    # ------------------------------------------------------------------
 
     def imports(self) -> list[dict[str, Any]]:
         """
