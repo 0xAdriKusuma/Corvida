@@ -35,6 +35,31 @@ class Config:
     rzpipe_timeout: int = 30
     """Seconds to wait for rizin operations."""
 
+    # ------------------------------------------------------------------
+    # AI layer (all off by default; activated only with --ai flag)
+    # ------------------------------------------------------------------
+
+    ai_enabled: bool = False
+    """If True, run the AI summarisation layer after rule-based analysis."""
+
+    ai_config_path: Path | None = None
+    """Path to corvida.yaml; None = auto-discover."""
+
+    ai_local_only: bool = False
+    """If True, reject all cloud providers (only local Ollama, etc.)."""
+
+    ai_no_cache: bool = False
+    """If True, skip reading/writing the AI response cache."""
+
+    ai_yes: bool = False
+    """If True, skip the cloud-send confirmation prompt."""
+
+    ai_exclude_strings: bool = False
+    """If True, omit interesting strings from the AI context."""
+
+    ai_debug: bool = False
+    """If True, emit verbose AI HTTP debug logs (no secrets logged)."""
+
     def __post_init__(self) -> None:
         self.rules_dir = Path(self.rules_dir).resolve()
 

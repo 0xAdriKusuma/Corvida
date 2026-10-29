@@ -112,6 +112,11 @@ class TerminalReporter(BaseReporter):
         if report.errors:
             self._render_errors(console, report)
 
+        # AI section — rendered only when --ai was used
+        ai_data = report.metadata.get("ai")
+        if ai_data is not None:
+            self._render_ai_section(console, ai_data)
+
         console.rule(style="dim")
 
     def _render_binary_info(self, console: Console, report: Report) -> None:
@@ -272,6 +277,93 @@ class TerminalReporter(BaseReporter):
     def _render_errors(self, console: Console, report: Report) -> None:
         lines = "\n".join(f"[yellow]⚠[/yellow]  {escape(e)}" for e in report.errors)
         console.print(Panel(lines, title="[bold yellow]Warnings / Errors[/bold yellow]", border_style="yellow"))
+
+    def _render_ai_section(self, console: Console, ai_data: dict) -> None:
+        """Render the AI summarisation panel below the rule-based results."""
+        from typing import Any
+
+        if ai_data is None:
+            console.print(Panel(
+                "[dim]AI layer was requested but no result was produced.[/dim]",
+                title="[bold]AI Summary[/bold] [dim](heuristic)[/dim]",
+                border_style="purple",
+            ))
+            return
+
+        verified   = ai_data.get("verification", {}).get("verified", 0)
+        total      = ai_data.get("verification", {}).get("total", 0)
+        confidence = ai_data.get("confidence", "?")
+        summary    = ai_data.get("summary", "")
+        from_cache = ai_data.get("from_cache", False)
+
+        conf_color = {"high": "green", "medium": "yellow", "low": "dim"}.get(confidence, "dim")
+        cache_tag  = " [dim](cached)[/dim]" if from_cache else ""
+
+        lines: list[str] = []
+        lines.append(
+            f"[bold]Confidence:[/bold] [{conf_color}]{confidence}[/{conf_color}]  "
+            f"[bold]Verification:[/bold] [cyan]{verified}/{total}[/cyan] claims supported{cache_tag}"
+        )
+        lines.append("")
+        if summary:
+            lines.append(f"[bold]Summary:[/bold]")
+            for part in _wrap(summary, 90):
+                lines.append(f"  {escape(part)}")
+            lines.append("")
+
+        # Claims
+        claims = ai_data.get("likely_vulns", [])
+        if claims:
+            lines.append("[bold]AI Claims:[/bold]")
+            for c in claims:
+                fid    = c.get("finding_id", "?")
+                desc   = c.get("description", "")
+                status = c.get("verified", c.get("llm_status", "unclear"))
+                status_str = {
+                    "supported":   "[green]✓ verified[/green]",
+                    "unsupported": "[red]✗ unverified[/red]",
+                    "unclear":     "[yellow]? unclear[/yellow]",
+                }.get(status, "[dim]?[/dim]")
+                lines.append(f"  [{fid}] {status_str}  {escape(desc[:100])}")
+                # Show deterministic flags if any
+                for flag in (c.get("det_flags") or []):
+                    lines.append(f"    [dim]⚠ {escape(flag)}[/dim]")
+            lines.append("")
+
+        # Next steps
+        next_steps = ai_data.get("next_steps", [])
+        if next_steps:
+            lines.append("[bold]Suggested Next Steps:[/bold]")
+            for step in next_steps[:5]:
+                lines.append(f"  [dim]→[/dim] {escape(step)}")
+            lines.append("")
+
+        # Models used
+        models = ai_data.get("models_used", {})
+        sum_m  = models.get("summarizer", "")
+        ver_m  = models.get("verifier", "")
+        if sum_m or ver_m:
+            lines.append(f"[dim]Models: summarizer={sum_m}  verifier={ver_m}[/dim]")
+
+        # Fallback log
+        fallback = ai_data.get("fallback_log", [])
+        if fallback:
+            lines.append(f"[dim]Fallback log: {'; '.join(fallback[:3])}[/dim]")
+
+        # Truncation notes
+        trunc = ai_data.get("truncation_notes", [])
+        if trunc:
+            lines.append(f"[dim]Truncation: {'; '.join(trunc)}[/dim]")
+
+        title = (
+            f"[bold]AI Summary[/bold] "
+            f"[dim](heuristic, verification: {verified}/{total} claims)[/dim]"
+        )
+        console.print(Panel(
+            "\n".join(lines).strip(),
+            title=title,
+            border_style="purple",
+        ))
 
 
 def _wrap(text: str, width: int) -> list[str]:

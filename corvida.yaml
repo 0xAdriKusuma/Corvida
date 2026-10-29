@@ -1,0 +1,69 @@
+# corvida.yaml — AI configuration for Corvida
+
+# ---------------------------------------------------------------------------
+# providers — define one entry per AI backend
+# ---------------------------------------------------------------------------
+providers:
+  # Model lokal (misal Ollama) tidak butuh API key:
+  local:
+    base_url: "http://localhost:11434/v1"
+    key_env: ""
+
+  # Groq (super cepat untuk CTF)
+  groq:
+    base_url: "https://api.groq.com/openai/v1"
+    key_env: "GROQ_API_KEY"
+
+  # Google Gemini (OpenAI-compatible endpoint)
+  gemini:
+    base_url: "https://generativelanguage.googleapis.com/v1beta/openai"
+    key_env: "GEMINI_API_KEY"
+
+  # OpenAI (opsional)
+  openai:
+    base_url: "https://api.openai.com/v1"
+    key_env: "OPENAI_API_KEY"
+
+  # DeepSeek (opsional)
+  deepseek:
+    base_url: "https://api.deepseek.com/v1"
+    key_env: "DEEPSEEK_API_KEY"
+
+
+# ---------------------------------------------------------------------------
+# roles — ordered fallback chain per role
+#         Corvida tries each entry in order; moves to next on failure.
+# ---------------------------------------------------------------------------
+roles:
+
+  summarizer:
+    - provider: gemini
+      model: "gemini-3.5-flash-lite"
+    - provider: groq
+      model: "llama-3.3-70b-versatile"
+    - provider: local
+      model: "phi4-mini"
+
+  code_explainer:
+    - provider: gemini
+      model: "gemini-3.5-flash-lite"
+    - provider: groq
+      model: "llama-3.3-70b-versatile"
+
+  verifier:
+    - provider: gemini
+      model: "gemini-3.5-flash-lite"
+    - provider: groq
+      model: "llama-3.1-8b-instant"
+    - provider: local
+      model: "qwen3:4b"
+
+
+# ---------------------------------------------------------------------------
+# policy — behaviour tuning
+# ---------------------------------------------------------------------------
+policy:
+  sensitive_local_only: false
+  cache: true
+  max_context_tokens: 6000
+  temperature: 0.2

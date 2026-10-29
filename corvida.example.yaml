@@ -1,0 +1,79 @@
+# corvida.example.yaml — Example AI configuration for Corvida
+#
+# Copy this file to corvida.yaml in your project root (or ~/.config/corvida/)
+# and edit to match your setup.
+#
+# IMPORTANT: Never commit real API keys to version control.
+#            Keys are read from environment variables only.
+#
+# Model names listed here are EXAMPLES only and may be outdated.
+# Always check the provider's current model list before using.
+
+# ---------------------------------------------------------------------------
+# providers — define one entry per AI backend
+# ---------------------------------------------------------------------------
+providers:
+
+  # Local Ollama (no key needed)
+  local:
+    base_url: "http://localhost:11434/v1"
+    key_env: ""                           # empty = no API key required
+
+  # Groq (fast inference, free tier available)
+  groq:
+    base_url: "https://api.groq.com/openai/v1"
+    key_env: "GROQ_API_KEY"              # set: export GROQ_API_KEY=gsk_...
+
+  # OpenRouter (access to many models, free-tier options available)
+  openrouter:
+    base_url: "https://openrouter.ai/api/v1"
+    key_env: "OPENROUTER_API_KEY"        # set: export OPENROUTER_API_KEY=sk-or-...
+
+# ---------------------------------------------------------------------------
+# roles — ordered fallback chain per role
+#         Corvida tries each entry in order; moves to next on failure.
+#
+# Role descriptions:
+#   summarizer     — summarises findings, suggests next steps
+#   code_explainer — explains decompiled pseudo-C of key functions (optional)
+#   verifier       — cross-checks AI claims against factual findings
+# ---------------------------------------------------------------------------
+roles:
+
+  summarizer:
+    - provider: local
+      model: "phi4-mini"               # example: adjust to what you have pulled
+    - provider: groq
+      model: "llama-3.3-70b-versatile" # example: check current model list
+
+  code_explainer:
+    - provider: groq
+      model: "llama-3.3-70b-versatile"
+    - provider: openrouter
+      model: "google/gemma-3-27b-it:free"  # example free model
+
+  verifier:
+    - provider: openrouter
+      model: "nvidia/llama-3.1-nemotron-ultra-253b-v1:free"  # example
+    - provider: local
+      model: "qwen3:4b"
+
+# ---------------------------------------------------------------------------
+# policy — behaviour tuning
+# ---------------------------------------------------------------------------
+policy:
+
+  # If true, only 'local' providers are used; cloud providers are rejected.
+  # Can also be forced with --local-only flag.
+  sensitive_local_only: false
+
+  # Cache AI responses keyed by (context hash + role + model + prompt version).
+  # Use --no-cache to bypass.
+  cache: true
+
+  # Approximate maximum token budget for the context sent to the model.
+  # Characters ÷ 4 is used as a fast estimate (no heavy tokeniser needed).
+  max_context_tokens: 6000
+
+  # Sampling temperature for all AI calls (lower = more deterministic).
+  temperature: 0.2

@@ -3,13 +3,24 @@ analyzers/common/strings.py — Interesting string extractor.
 
 Strategy
 --------
-1. Use backend.strings() if a backend is available (rizin is more accurate).
-2. Fall back to a pure-Python scan of the binary if no backend.
-3. Score each string by matching against interest patterns.
-4. Return only the top-N strings (config.max_strings).
+1. Use backend.strings() if a backend is available (rizin is more accurate,
+   returns virtual addresses and section names correctly).
+2. Fall back to a pyelftools-based scan of .rodata (and other data sections)
+   for ELF files — this is much more accurate than a raw binary scan because
+   it gives correct virtual addresses and avoids scanning code sections.
+3. Last resort: pure-Python raw byte scan of the entire binary (all sections).
+4. Score each string by matching against interest patterns.
+5. Return only the top-N strings (config.max_strings).
+
+When rizin is unavailable, a degradation warning is added to the report
+and AI context confidence is lowered accordingly.
 
 Interest patterns are defined in this file rather than YAML because they
 are general-purpose (not pwn-specific) and rarely change.
+
+Regression test reference
+--------------------------
+String virtual addresses are verified against ``strings -t x`` output.
 """
 
 from __future__ import annotations
@@ -66,27 +77,116 @@ _COMPILED = [
 _PRINTABLE = set(range(0x20, 0x7F)) | {0x09, 0x0A, 0x0D}
 
 
+# ---------------------------------------------------------------------------
+# ELF section-aware scanner (pyelftools fallback)
+# ---------------------------------------------------------------------------
+
+# Sections that typically hold string data.  We scan these in order.
+_STRING_SECTIONS = [".rodata", ".data", ".data.rel.ro", ".rodata.str1.4", ".rodata.str1.8"]
+
+
+def _scan_elf_sections(path: Path, min_len: int) -> list[dict]:
+    """
+    Extract printable strings from ELF data sections using pyelftools.
+
+    Returns dicts with keys: string, vaddr, file_offset, section, length.
+    Virtual addresses match what `strings -t x` reports (file-offset mode)
+    because we compute both and store both.
+    """
+    try:
+        from elftools.elf.elffile import ELFFile
+    except ImportError:
+        return _scan_binary(path, min_len)
+
+    results: list[dict] = []
+    try:
+        with open(path, "rb") as fh:
+            elf = ELFFile(fh)
+            for sec_name in _STRING_SECTIONS:
+                sec = elf.get_section_by_name(sec_name)
+                if sec is None:
+                    continue
+                data        = sec.data()
+                sec_vaddr   = sec.header.sh_addr
+                sec_offset  = sec.header.sh_offset
+
+                buf: list[int] = []
+                buf_start = 0
+                for i, b in enumerate(data):
+                    if b in _PRINTABLE and b != 0:
+                        if not buf:
+                            buf_start = i
+                        buf.append(b)
+                    else:
+                        if len(buf) >= min_len:
+                            s = bytes(buf).decode("ascii", errors="replace")
+                            results.append({
+                                "string":      s,
+                                "vaddr":       sec_vaddr + buf_start,
+                                "file_offset": sec_offset + buf_start,
+                                "section":     sec_name,
+                                "length":      len(buf),
+                            })
+                        buf = []
+                # flush remaining
+                if len(buf) >= min_len:
+                    s = bytes(buf).decode("ascii", errors="replace")
+                    results.append({
+                        "string":      s,
+                        "vaddr":       sec_vaddr + buf_start,
+                        "file_offset": sec_offset + buf_start,
+                        "section":     sec_name,
+                        "length":      len(buf),
+                    })
+    except Exception:  # noqa: BLE001
+        return _scan_binary(path, min_len)
+
+    if not results:
+        # ELF parse succeeded but no recognised string sections — do raw scan
+        return _scan_binary(path, min_len)
+
+    return results
+
+
 def _scan_binary(path: Path, min_len: int) -> list[dict]:
-    """Extract printable strings directly from binary bytes."""
+    """
+    Extract printable strings directly from raw binary bytes.
+
+    Note: vaddr here is really the file offset — this is the same
+    convention used by ``strings -t x``.
+    """
     results = []
     with open(path, "rb") as fh:
         data = fh.read()
 
     buf: list[int] = []
-    offset = 0
+    buf_start = 0
     for i, b in enumerate(data):
-        if b in _PRINTABLE:
+        if b in _PRINTABLE and b != 0:
+            if not buf:
+                buf_start = i
             buf.append(b)
         else:
             if len(buf) >= min_len:
                 s = bytes(buf).decode("ascii", errors="replace")
                 results.append({
-                    "string":  s,
-                    "vaddr":   i - len(buf),
-                    "section": None,
-                    "length":  len(buf),
+                    "string":      s,
+                    "vaddr":       buf_start,
+                    "file_offset": buf_start,
+                    "section":     None,
+                    "length":      len(buf),
                 })
             buf = []
+    # flush
+    if len(buf) >= min_len:
+        s = bytes(buf).decode("ascii", errors="replace")
+        results.append({
+            "string":      s,
+            "vaddr":       buf_start,
+            "file_offset": buf_start,
+            "section":     None,
+            "length":      len(buf),
+        })
     return results
 
 
@@ -120,13 +220,19 @@ class StringsAnalyzer(BaseAnalyzer):
     def analyze(
         self, target: Target, config: Config, backend: BaseBackend | None = None
     ) -> list[Finding]:
+        backend_used = False
+        raw: list[dict] = []
+
         if backend is not None:
             try:
                 raw = backend.strings(min_len=config.min_string_len)
+                backend_used = True
             except Exception:    # noqa: BLE001
-                raw = _scan_binary(target.path, config.min_string_len)
-        else:
-            raw = _scan_binary(target.path, config.min_string_len)
+                raw = []
+
+        if not backend_used:
+            # Use section-aware pyelftools fallback (accurate vaddrs)
+            raw = _scan_elf_sections(target.path, config.min_string_len)
 
         scored: list[tuple[float, dict, str, Severity, Confidence]] = []
         for entry in raw:
@@ -141,17 +247,33 @@ class StringsAnalyzer(BaseAnalyzer):
         findings: list[Finding] = []
         for sc, entry, label, sev, conf in top:
             s    = entry["string"]
-            addr = entry.get("vaddr", 0)
+            vaddr = entry.get("vaddr", 0)
+            foff  = entry.get("file_offset", vaddr)  # file offset for strings -t x compat
             sec  = entry.get("section") or "?"
+
+            # Location shows vaddr (matches vmmap) and file offset (matches strings -t x)
+            if vaddr and vaddr != foff:
+                loc = f"vaddr={vaddr:#010x} foff={foff:#010x} ({sec})"
+            elif vaddr:
+                loc = f"{vaddr:#010x} ({sec})"
+            else:
+                loc = sec
+
             findings.append(Finding(
                 title      = f"{label}: {s[:60]!r}",
                 category   = Category.STRINGS,
                 severity   = sev,
                 confidence = conf,
-                location   = f"{addr:#010x} ({sec})" if addr else sec,
+                location   = loc,
                 evidence   = [s],
                 advice     = None,
-                extra      = {"string": s, "vaddr": addr, "section": sec},
+                extra      = {
+                    "string":      s,
+                    "vaddr":       vaddr,
+                    "file_offset": foff,
+                    "section":     sec,
+                    "backend":     backend_used,
+                },
             ))
 
         return findings

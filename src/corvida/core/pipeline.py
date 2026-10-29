@@ -62,6 +62,25 @@ def run(path: Path, config: Config) -> Report:
         except BackendUnavailableError as exc:
             report.add_error(str(exc))
             backend = None
+            # Add a visible degradation notice as a finding
+            report.add(Finding(
+                title    = "Backend unavailable: rizin not found",
+                category = Category.INFO,
+                severity = Severity.INFO,
+                confidence = Confidence.CERTAIN,
+                advice   = (
+                    "Install rizin for richer analysis (xrefs, disasm, accurate strings). "
+                    "Windows: https://github.com/rizinorg/rizin/releases  "
+                    "WSL2: sudo apt install rizin  "
+                    "pip: pip install rzpipe  (requires rizin in PATH)"
+                ),
+                evidence = [
+                    "rizin backend unavailable — falling back to pyelftools only.",
+                    "Affected: cross-reference analysis, call site detection, disassembly.",
+                    "Confidence of some findings may be reduced.",
+                ],
+                extra    = {"key": "rizin_missing", "value": True},
+            ))
         except Exception as exc:         # noqa: BLE001
             report.add_error(f"Backend init error: {exc}")
             backend = None

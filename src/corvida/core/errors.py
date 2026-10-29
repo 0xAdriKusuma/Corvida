@@ -36,3 +36,23 @@ class AnalyzerError(CorvidaError):
 
 class RuleError(CorvidaError):
     """Raised when a rules YAML file is malformed or missing."""
+
+
+# ---------------------------------------------------------------------------
+# AI layer errors
+# ---------------------------------------------------------------------------
+
+class AIError(CorvidaError):
+    """Base class for all AI layer errors."""
+
+
+class AIConfigError(AIError):
+    """Raised when corvida.yaml is missing, malformed, or logically invalid."""
+
+
+class ProviderError(AIError):
+    """Raised when all providers for a role have been exhausted."""
+
+
+class PrivacyError(AIError):
+    """Raised when a cloud provider is requested but local-only mode is active."""

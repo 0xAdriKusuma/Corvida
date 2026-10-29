@@ -26,8 +26,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "pytest-cov", "mypy", "ruff"]
+dev  = ["pytest>=8", "pytest-cov", "mypy", "ruff"]
 rzpipe = ["rzpipe>=0.4"]
+ai   = ["httpx>=0.27", "pydantic>=2.0"]
 
 [project.scripts]
 corvida = "corvida.cli:app"

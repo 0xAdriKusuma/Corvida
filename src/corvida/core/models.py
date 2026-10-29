@@ -100,6 +100,13 @@ class Finding:
 
     confidence: Confidence = Confidence.MEDIUM
 
+    id: str | None = None
+    """
+    Optional stable identifier assigned by the AI context builder.
+    Format: F0001, F0002, … — used so AI claims can reference specific findings.
+    None until the AI layer assigns one (rule-based path never touches this).
+    """
+
     location: str | None = None
     """
     Where in the binary this was found.
@@ -140,7 +147,7 @@ class Finding:
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a plain dict (used by JSON reporter)."""
-        return {
+        d: dict[str, Any] = {
             "title":      self.title,
             "category":   self.category.value,
             "severity":   self.severity.value,
@@ -151,6 +158,9 @@ class Finding:
             "advice":     self.advice,
             "extra":      self.extra,
         }
+        if self.id is not None:
+            d["id"] = self.id
+        return d
 
 
 def _default_score(severity: Severity, confidence: Confidence) -> float:

@@ -25,5 +25,8 @@ class JsonReporter(BaseReporter):
 
     def render(self, report: Report, config: Config) -> None:
         data = report.to_dict()
+        # Attach AI section if the AI layer ran
+        if "ai" in report.metadata:
+            data["ai"] = report.metadata["ai"]
         # Pretty-print for human readability; downstream tools can minify
         print(json.dumps(data, indent=2, ensure_ascii=False))
